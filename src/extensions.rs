@@ -30,9 +30,9 @@ pub fn get_extension_state(bundle_id: &str) -> Result<ExtensionState> {
         });
     }
 
-    // Check if the extension is in "ignore" state
-    // The output format includes flags like [*] for enabled, [-] for ignored
-    let enabled = !stdout.contains("[-]") && !stdout.to_lowercase().contains("ignore");
+    // Check if the extension is enabled
+    // The output format: lines start with "+" for enabled, "-" for disabled
+    let enabled = stdout.trim_start().starts_with('+');
 
     Ok(ExtensionState {
         bundle_id: bundle_id.to_string(),
