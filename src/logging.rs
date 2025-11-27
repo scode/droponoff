@@ -18,19 +18,16 @@ where
         mut writer: Writer<'_>,
         event: &Event<'_>,
     ) -> fmt::Result {
-        // Get the message fields as a string
         let mut visitor = MessageVisitor::new();
         event.record(&mut visitor);
         let message = visitor.message;
 
-        // Add emoji prefix based on message content and level
         let emoji_message = add_emoji_prefix(&message, event.metadata().level());
 
         writeln!(writer, "{}", emoji_message)
     }
 }
 
-/// Helper struct to extract the message from event fields
 struct MessageVisitor {
     message: String,
 }
@@ -74,27 +71,12 @@ fn add_emoji_prefix(message: &str, level: &Level) -> String {
         Level::ERROR => format!("❌ {}", message),
         Level::WARN => format!("⚠️  {}", message),
         Level::INFO => {
-            // Status/verification messages
-            if message.contains("Status")
-                || message.contains("processes:")
-                || message.contains("LaunchAgent:")
-                || message.contains("Extensions:")
-                || message.contains("Dropbox.app:")
-                || message.starts_with("  ") // Indented status lines
-                || message.starts_with("==")
-            // Separator lines
-            {
-                format!("ℹ️  {}", message)
-            } else {
-                // Default INFO - no prefix
-                message.to_string()
-            }
+            format!("ℹ️  {}", message)
         }
         _ => message.to_string(),
     }
 }
 
-/// Initialize the tracing subscriber with emoji formatting
 pub fn init_logging() {
     tracing_subscriber::fmt()
         .with_target(false)

@@ -8,7 +8,6 @@ mod launchagent;
 mod logging;
 mod processes;
 mod status;
-mod sudo;
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
@@ -33,7 +32,6 @@ enum Commands {
 }
 
 fn main() -> Result<()> {
-    // Initialize tracing with colored output
     logging::init_logging();
 
     let cli = Cli::parse();
@@ -73,30 +71,26 @@ where
 fn cmd_off() -> Result<()> {
     info!("Disabling Dropbox...\n");
 
-    // Step 1: Request Dropbox to quit gracefully
     info!("→ Requesting Dropbox to quit...");
     if let Err(e) = processes::quit_dropbox_gracefully() {
         warn!("  Note: {}", e);
     }
 
-    // Step 2: Disable LaunchAgent
     info!("→ Disabling LaunchAgent...");
     launchagent::unload_launch_agent().ok(); // Ignore if not loaded
     launchagent::disable_launch_agent()?;
 
-    // Step 3: Disable extensions
     info!("→ Disabling Dropbox extensions...");
     extensions::disable_all_extensions()?;
 
-    // Step 4: Refresh Finder
+    // Refresh finder in the hopes it will relinquish any active
+    // file provider dependencies.
     info!("→ Restarting Finder...");
     finder::restart_finder()?;
 
-    // Step 5: Wait for non-FileProvider processes to quit gracefully
     info!("→ Waiting for non-FileProvider processes to stop...");
     processes::wait_for_non_fileprovider_processes_to_die(10)?;
 
-    // Step 6: Kill DropboxFileProvider processes with SIGTERM
     // Note: We have found no other way to gracefully terminate FileProvider processes
     // using command-line tools. SIGTERM should be reasonably safe unless the provider
     // already has other bugs - it's at the very least as graceful as an actual normal
@@ -105,12 +99,10 @@ fn cmd_off() -> Result<()> {
     info!("→ Terminating DropboxFileProvider processes...");
     processes::kill_fileprovider_processes()?;
 
-    // Step 7: Wait for all remaining processes to stop
     info!("→ Waiting for all processes to stop...");
     processes::wait_for_processes_to_die(10)?;
 
-    // Step 8: Verify
-    info!("→ Verifying...");
+    info!("→ Checking status...");
     verify_with_retry(
         |status| {
             let mut verified = true;
@@ -150,28 +142,20 @@ fn cmd_off() -> Result<()> {
 fn cmd_on() -> Result<()> {
     info!("Enabling Dropbox...\n");
 
-    // Step 1: Restore LaunchAgent
     info!("→ Restoring LaunchAgent...");
     launchagent::enable_launch_agent()?;
     launchagent::load_launch_agent()?;
 
-    // Step 2: Enable extensions
     info!("→ Enabling Dropbox extensions...");
     extensions::enable_all_extensions()?;
 
-    // Step 3: Refresh Finder
-    info!("→ Restarting Finder...");
-    finder::restart_finder()?;
-
-    // Step 4: Launch Dropbox
     info!("→ Launching Dropbox...");
     processes::launch_dropbox()?;
 
     info!("→ Waiting for Dropbox to start...");
     processes::wait_for_dropbox_to_start(10)?;
 
-    // Step 5: Verify
-    info!("→ Verifying...");
+    info!("→ Checking status...");
     verify_with_retry(
         |status| {
             let mut verified = true;
@@ -190,7 +174,8 @@ fn cmd_on() -> Result<()> {
                 .extensions
                 .iter()
                 .filter(|(bundle_id, s)| {
-                    // Exclude garcon from the check
+                    // Exclude garcon from the check (seems to have to do with
+                    // old school non-file system provider operation)
                     *bundle_id != "com.getdropbox.dropbox.garcon" && !s.enabled
                 })
                 .map(|(name, _)| name.as_str())
