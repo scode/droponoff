@@ -51,6 +51,25 @@ fn main() -> Result<()> {
     result
 }
 
+fn verify_with_retry<F>(check_fn: F, max_attempts: u32, delay_ms: u64) -> Result<()>
+where
+    F: Fn(&status::Status) -> bool,
+{
+    for attempt in 1..=max_attempts {
+        let status = status::get_status()?;
+
+        if check_fn(&status) {
+            return Ok(());
+        }
+
+        if attempt < max_attempts {
+            std::thread::sleep(std::time::Duration::from_millis(delay_ms));
+        }
+    }
+
+    anyhow::bail!("Verification failed after {} attempts", max_attempts)
+}
+
 fn cmd_off() -> Result<()> {
     info!("Disabling Dropbox...\n");
 
@@ -73,24 +92,59 @@ fn cmd_off() -> Result<()> {
     info!("→ Restarting Finder...");
     finder::restart_finder()?;
 
-    // Step 5: Wait for all processes to stop
-    info!("→ Waiting for processes to stop...");
+    // Step 5: Wait for non-FileProvider processes to quit gracefully
+    info!("→ Waiting for non-FileProvider processes to stop...");
+    processes::wait_for_non_fileprovider_processes_to_die(10)?;
+
+    // Step 6: Kill DropboxFileProvider processes with SIGTERM
+    // Note: We have found no other way to gracefully terminate FileProvider processes
+    // using command-line tools. SIGTERM should be reasonably safe unless the provider
+    // already has other bugs - it's at the very least as graceful as an actual normal
+    // crash or similar event. There used to be a fileproviderctl command to
+    // remove "domains" - but the command disappeared in Sonoma.
+    info!("→ Terminating DropboxFileProvider processes...");
+    processes::kill_fileprovider_processes()?;
+
+    // Step 7: Wait for all remaining processes to stop
+    info!("→ Waiting for all processes to stop...");
     processes::wait_for_processes_to_die(10)?;
 
-    // Step 6: Verify
+    // Step 8: Verify
     info!("→ Verifying...");
-    let status = status::get_status()?;
+    verify_with_retry(
+        |status| {
+            let mut verified = true;
+
+            if !status.processes.is_empty() {
+                warn!("  Still running: {} process(es)", status.processes.len());
+                verified = false;
+            }
+
+            if status.launch_agent_state != status::LaunchAgentState::Disabled {
+                warn!("  LaunchAgent state: {:?}", status.launch_agent_state);
+                verified = false;
+            }
+
+            let enabled_exts: Vec<_> = status
+                .extensions
+                .iter()
+                .filter(|(_, s)| s.enabled)
+                .map(|(name, _)| name.as_str())
+                .collect();
+            if !enabled_exts.is_empty() {
+                warn!("  Extensions still enabled: {}", enabled_exts.join(", "));
+                verified = false;
+            }
+
+            verified
+        },
+        5,
+        500,
+    )?;
 
     info!("");
-    if status.processes.is_empty()
-        && status.launch_agent_state == status::LaunchAgentState::Disabled
-        && status.extensions.iter().all(|(_, s)| !s.enabled)
-    {
-        info!("✓ Dropbox is now OFF");
-        Ok(())
-    } else {
-        anyhow::bail!("Verification failed - Dropbox may not be fully disabled");
-    }
+    info!("✓ Dropbox is now OFF");
+    Ok(())
 }
 
 fn cmd_on() -> Result<()> {
@@ -118,18 +172,43 @@ fn cmd_on() -> Result<()> {
 
     // Step 5: Verify
     info!("→ Verifying...");
-    let status = status::get_status()?;
+    verify_with_retry(
+        |status| {
+            let mut verified = true;
+
+            if status.processes.is_empty() {
+                warn!("  No processes running yet");
+                verified = false;
+            }
+
+            if status.launch_agent_state != status::LaunchAgentState::Enabled {
+                warn!("  LaunchAgent state: {:?}", status.launch_agent_state);
+                verified = false;
+            }
+
+            let disabled_exts: Vec<_> = status
+                .extensions
+                .iter()
+                .filter(|(bundle_id, s)| {
+                    // Exclude garcon from the check
+                    *bundle_id != "com.getdropbox.dropbox.garcon" && !s.enabled
+                })
+                .map(|(name, _)| name.as_str())
+                .collect();
+            if !disabled_exts.is_empty() {
+                warn!("  Extensions still disabled: {}", disabled_exts.join(", "));
+                verified = false;
+            }
+
+            verified
+        },
+        5,
+        500,
+    )?;
 
     info!("");
-    if !status.processes.is_empty()
-        && status.launch_agent_state == status::LaunchAgentState::Enabled
-        && status.extensions.iter().all(|(_, s)| s.enabled)
-    {
-        info!("✓ Dropbox is now ON");
-        Ok(())
-    } else {
-        anyhow::bail!("Verification failed - Dropbox may not be fully enabled");
-    }
+    info!("✓ Dropbox is now ON");
+    Ok(())
 }
 
 fn cmd_status() -> Result<()> {
