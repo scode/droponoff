@@ -1,0 +1,13 @@
+[package]
+name = "droponoff"
+version = "0.1.0"
+edition = "2021"
+description = "A reversible kill switch for Dropbox on macOS"
+
+[dependencies]
+clap = { version = "4", features = ["derive"] }
+duct = "0.13"
+anyhow = "1"
+dirs = "5"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
