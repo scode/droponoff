@@ -30,7 +30,6 @@ pub fn get_extension_state(bundle_id: &str) -> Result<ExtensionState> {
         });
     }
 
-    // Check if the extension is enabled
     // The output format: lines start with "+" for enabled, "-" for disabled
     let enabled = stdout.trim_start().starts_with('+');
 
@@ -39,15 +38,6 @@ pub fn get_extension_state(bundle_id: &str) -> Result<ExtensionState> {
         enabled,
         found: true,
     })
-}
-
-#[allow(dead_code)]
-pub fn get_all_extension_states() -> Result<Vec<ExtensionState>> {
-    let mut states = Vec::new();
-    for bundle_id in discovery::DROPBOX_BUNDLE_IDS {
-        states.push(get_extension_state(bundle_id)?);
-    }
-    Ok(states)
 }
 
 pub fn disable_extension(bundle_id: &str) -> Result<()> {

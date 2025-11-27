@@ -15,8 +15,6 @@ struct DropboxProcessLists {
     non_fileprovider: Vec<DropboxProcess>,
 }
 
-/// Returns all Dropbox processes from a single pgrep invocation, partitioned into
-/// fileprovider and non-fileprovider lists for consistency
 fn list_all_dropbox_processes() -> Result<DropboxProcessLists> {
     let user = std::env::var("USER").context("Could not get USER environment variable")?;
 
@@ -41,7 +39,6 @@ fn list_all_dropbox_processes() -> Result<DropboxProcessLists> {
                 non_fileprovider: Vec::new(),
             });
         } else {
-            // Exit code 2 or 3 indicates an actual error
             anyhow::bail!("pgrep failed with exit code {}", exit_code);
         }
     }
@@ -164,12 +161,9 @@ pub fn wait_for_dropbox_to_start(timeout_secs: u64) -> Result<()> {
 }
 
 pub fn kill_fileprovider_processes() -> Result<()> {
-    // Use the same process listing mechanism to find FileProvider processes
     let process_lists = list_all_dropbox_processes()?;
 
-    // Send SIGTERM to each FileProvider process
     for process in &process_lists.fileprovider {
-        // Use kill command to send SIGTERM (default signal)
         let _ = cmd!("kill", process.pid.to_string())
             .stdout_null()
             .stderr_null()

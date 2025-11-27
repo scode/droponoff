@@ -13,10 +13,8 @@ fn get_user_id() -> Result<String> {
 }
 
 pub fn unload_launch_agent() -> Result<()> {
-    let path = discovery::get_launch_agent_path()?;
     let uid = get_user_id()?;
 
-    // Use bootout with the service target (more modern approach)
     let service_target = format!("gui/{}/com.dropbox.DropboxMacUpdate.agent", uid);
 
     cmd!("launchctl", "bootout", &service_target)
@@ -25,15 +23,6 @@ pub fn unload_launch_agent() -> Result<()> {
         .unchecked()
         .run()
         .context("Failed to unload LaunchAgent")?;
-
-    // Also try the legacy unload approach as backup
-    if path.exists() {
-        let _ = cmd!("launchctl", "unload", &path)
-            .stdout_null()
-            .stderr_null()
-            .unchecked()
-            .run();
-    }
 
     Ok(())
 }
@@ -46,7 +35,6 @@ pub fn load_launch_agent() -> Result<()> {
         anyhow::bail!("LaunchAgent plist not found at {:?}", path);
     }
 
-    // Use bootstrap with gui domain (modern approach)
     let domain_target = format!("gui/{}", uid);
 
     cmd!("launchctl", "bootstrap", &domain_target, &path)
@@ -64,7 +52,6 @@ pub fn disable_launch_agent() -> Result<()> {
     let disabled_path = discovery::get_launch_agent_disabled_path()?;
 
     if disabled_path.exists() {
-        // Already disabled
         info!("  LaunchAgent already disabled");
         return Ok(());
     }
@@ -83,7 +70,6 @@ pub fn enable_launch_agent() -> Result<()> {
     let disabled_path = discovery::get_launch_agent_disabled_path()?;
 
     if enabled_path.exists() {
-        // Already enabled
         info!("  LaunchAgent already enabled");
         return Ok(());
     }

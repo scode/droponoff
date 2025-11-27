@@ -38,14 +38,12 @@ pub fn print_status(status: &Status) {
     info!("Dropbox Status");
     info!("==============\n");
 
-    // App location
     match &status.dropbox_app_path {
         Some(path) => info!("Dropbox.app: {}", path.display()),
         None => info!("Dropbox.app: NOT FOUND"),
     }
     info!("");
 
-    // Running processes
     info!("Running processes:");
     if status.processes.is_empty() {
         info!("  (none)");
@@ -56,7 +54,6 @@ pub fn print_status(status: &Status) {
     }
     info!("");
 
-    // LaunchAgent state
     let la_state = match status.launch_agent_state {
         LaunchAgentState::Enabled => "enabled",
         LaunchAgentState::Disabled => "disabled",
@@ -65,7 +62,6 @@ pub fn print_status(status: &Status) {
     info!("LaunchAgent: {}", la_state);
     info!("");
 
-    // Extensions
     info!("Extensions:");
     for (bundle_id, state) in &status.extensions {
         let status_str = if !state.found {
