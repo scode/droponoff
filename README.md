@@ -32,13 +32,16 @@ cargo install --path .
 # Check current Dropbox state
 droponoff status
 
-# Completely disable Dropbox
+# Completely disable Dropbox. If you are intending using nuke-scratch,
+# you should wait for Dropbox to have finished any synchronization
+# activity (especially any uploads).
 droponoff off
 
 # Restore Dropbox to normal operation
 droponoff on
 
-# With Dropbox OFF, delete scratch_files contents. Will refuse
+# With Dropbox OFF and no pending file synchronization in flight prior
+# to being turned off, delete scratch files. Will refuse
 # to do anything if it detects Dropbox is still running.
 droponoff nuke-scratch
 ```

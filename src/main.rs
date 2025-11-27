@@ -11,6 +11,7 @@ mod status;
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
+use indoc::indoc;
 use tracing::{error, info, warn};
 
 #[derive(Parser)]
@@ -25,11 +26,24 @@ struct Cli {
 enum Commands {
     /// Restore Dropbox to normal operation
     On,
-    /// Disable Dropbox completely
+    /// Disable Dropbox completely (DOES NOT WAIT FOR SYNCHRONIZATION TO FINISH).
     Off,
     /// Show current Dropbox state (read-only)
     Status,
-    /// Delete scratch_files contents after ensuring Dropbox is stopped
+    #[command(
+        about = "DANGEROUS: Delete scratch_files contents after ensuring Dropbox is stopped (READ FULL HELP).",
+        long_about = indoc! {r#"
+            DANGEROUS: Delete scratch_files contents after ensuring Dropbox is stopped (READ FULL HELP).
+
+            This will nuke scratch files. It should only be used:
+
+            - With Dropbox entirely turned off.
+            - With no pending synchronization operations (especially uploads) at the time Dropbox was turned off.
+
+            If this is run while uploads are occurring it is highly likely to lead to data loss. Even if used as
+            recommended, this command is risky and is not in any way supported by Dropbox or the author of this tool.
+        "#}
+    )]
     NukeScratch,
 }
 
