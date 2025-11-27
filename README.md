@@ -40,6 +40,8 @@ droponoff off
 # Restore Dropbox to normal operation
 droponoff on
 
+# DANGEROUS:
+#
 # With Dropbox OFF and no pending file synchronization in flight prior
 # to being turned off, delete scratch files. Will refuse
 # to do anything if it detects Dropbox is still running.
