@@ -5,13 +5,14 @@ mod discovery;
 mod extensions;
 mod finder;
 mod launchagent;
+mod logging;
 mod processes;
 mod status;
 mod sudo;
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
-use tracing::{info, warn};
+use tracing::{error, info, warn};
 
 #[derive(Parser)]
 #[command(name = "droponoff")]
@@ -32,20 +33,22 @@ enum Commands {
 }
 
 fn main() -> Result<()> {
-    // Initialize tracing with INFO level by default
-    tracing_subscriber::fmt()
-        .with_target(false)
-        .with_level(false)
-        .without_time()
-        .init();
+    // Initialize tracing with colored output
+    logging::init_logging();
 
     let cli = Cli::parse();
 
-    match cli.command {
+    let result = match cli.command {
         Commands::Off => cmd_off(),
         Commands::On => cmd_on(),
         Commands::Status => cmd_status(),
+    };
+
+    if let Err(ref e) = result {
+        error!("{}", e);
     }
+
+    result
 }
 
 fn cmd_off() -> Result<()> {
