@@ -29,6 +29,8 @@ enum Commands {
     Off,
     /// Show current Dropbox state (read-only)
     Status,
+    /// Delete scratch_files contents after ensuring Dropbox is stopped
+    NukeScratch,
 }
 
 fn main() -> Result<()> {
@@ -40,6 +42,7 @@ fn main() -> Result<()> {
         Commands::Off => cmd_off(),
         Commands::On => cmd_on(),
         Commands::Status => cmd_status(),
+        Commands::NukeScratch => cmd_nuke_scratch(),
     };
 
     if let Err(ref e) = result {
@@ -199,5 +202,24 @@ fn cmd_on() -> Result<()> {
 fn cmd_status() -> Result<()> {
     let status = status::get_status()?;
     status::print_status(&status);
+    Ok(())
+}
+
+fn cmd_nuke_scratch() -> Result<()> {
+    info!("Deleting scratch_files contents...\n");
+
+    info!("→ Checking Dropbox status...");
+    let status = status::get_status()?;
+    if !status.processes.is_empty() {
+        anyhow::bail!(
+            "Dropbox appears to be running. Run `droponoff status` to check and `droponoff off` to turn it off."
+        );
+    }
+
+    info!("→ Cleaning scratch_files directories...");
+    status::clean_scratch_files()?;
+
+    info!("");
+    info!("✓ scratch_files contents deleted");
     Ok(())
 }

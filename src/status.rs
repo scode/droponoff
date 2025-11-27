@@ -3,10 +3,14 @@ use crate::extensions::{self, ExtensionState};
 use crate::launchagent;
 use crate::processes::{self, DropboxProcess};
 use anyhow::Result;
-use std::path::PathBuf;
+use std::fs;
+use std::path::{Path, PathBuf};
 use tracing::info;
 
 pub use crate::launchagent::LaunchAgentState;
+
+const DROPBOX_TEAM_ID: &str = "G7HH3F8CAK";
+const GROUP_CONTAINER_SUFFIX: &str = ".com.getdropbox.dropbox.sync";
 
 pub struct Status {
     pub dropbox_app_path: Option<PathBuf>,
@@ -73,4 +77,65 @@ pub fn print_status(status: &Status) {
         };
         info!("  {}: {}", bundle_id, status_str);
     }
+}
+
+/// Delete immediate children inside any scratch_files directories under the Dropbox root mount.
+pub fn clean_scratch_files() -> Result<()> {
+    let home = discovery::get_home_dir()?;
+    let data_home = PathBuf::from("/System/Volumes/Data")
+        .join(home.strip_prefix(Path::new("/")).unwrap_or(&home));
+    let base_home = if data_home.exists() { data_home } else { home };
+
+    let container_name = format!("{}{}", DROPBOX_TEAM_ID, GROUP_CONTAINER_SUFFIX);
+    let root_mount = base_home
+        .join("Library/Group Containers")
+        .join(container_name)
+        .join("root-mount");
+
+    if !root_mount.exists() {
+        anyhow::bail!("Dropbox root-mount not found at {}", root_mount.display());
+    }
+
+    // Find files immediately inside a directory like this and delete them:
+    //
+    // System/Volumes/Data/USERNAME/scode/Library/Group Containers/G7HH3F8CAK.com.getdropbox.dropbox.sync/root-mount/UUID/scratch_files
+    let mut found_any = false;
+    for entry in fs::read_dir(&root_mount)? {
+        let entry = entry?;
+        if !entry.file_type()?.is_dir() {
+            continue;
+        }
+
+        let scratch_dir = entry.path().join("scratch_files");
+        if !scratch_dir.is_dir() {
+            continue;
+        }
+
+        found_any = true;
+        info!("  Cleaning {}", scratch_dir.display());
+
+        // Only remove immediate files/symlinks; skip nested
+        // directories as we don't expect them.
+        for child in fs::read_dir(&scratch_dir)? {
+            let child = child?;
+            let child_type = child.file_type()?;
+            let child_path = child.path();
+
+            if child_type.is_file() || child_type.is_symlink() {
+                info!("    rm {}", child_path.display());
+                fs::remove_file(&child_path)?;
+            } else {
+                info!("    Skipping directory {}", child_path.display());
+            }
+        }
+    }
+
+    if !found_any {
+        info!(
+            "  No scratch_files directories found under {}",
+            root_mount.display()
+        );
+    }
+
+    Ok(())
 }
