@@ -8,48 +8,45 @@ A **scriptable, reversible kill switch for Dropbox** on macOS.
 
 **DO NOT USE THIS TOOL WITHOUT FIRST READING THROUGH THE ENTIRE CODEBASE.**
 
-This is early-stage software. Make no assumptions about its safety or correctness. You must understand exactly what it does before running any commands. Improper use could affect your Dropbox installation and data synchronization.
+- Make no assumptions about its safety or correctness.
+- You must understand exactly what it does before using it and
+  make your own decision on whether to risk it.
+- The processes implemented by this tool is in no way supported by
+  Dropbox nor the author of this tool.
 
 ---
 
 ## Purpose
 
-`droponoff` provides complete control over Dropbox's operation on macOS, allowing you to safely manipulate Dropbox's internal state files:
-
-- **OFF mode:** Dropbox becomes completely inert—no UI, no background processes, no auto-relaunch, no File Provider behavior. Internal Dropbox files can be safely manipulated without interference.
-- **ON mode:** Restore Dropbox to normal operation so it can reindex and rebuild whatever changed.
-
-## Key Features
-
-- **Reversible:** All changes can be undone. Configuration files are renamed (not deleted) and can be fully restored.
-- **Safe:** Only touches Dropbox processes, LaunchAgents, and extensions. Your Dropbox files remain untouched.
-- **Idempotent:** Running `off` or `on` multiple times is safe and won't cause instability.
-- **User-level:** Operates within your user account without requiring system-wide changes.
+`droponoff` exists to **make it safe to clean up Dropbox's leaked scratch files** that eat unbounded amount of disk space. Dropbox sometimes leaves behind `scratch_files` under its File Provider group container, and you shouldn't touch them while Dropbox is running. This tool provides a reversible way to stop Dropbox completely, verify it's off, and then remove those leftovers. (But again, this is entirely unsupported and risky.)
 
 ## Installation
 
 ```bash
-cargo build --release
+cargo install --path .
 ```
 
 ## Usage
 
 ```bash
-# Completely disable Dropbox
-droponoff off
-
 # Check current Dropbox state
 droponoff status
 
+# Completely disable Dropbox
+droponoff off
+
 # Restore Dropbox to normal operation
 droponoff on
+
+# With Dropbox OFF, delete scratch_files contents. Will refuse
+# to do anything if it detects Dropbox is still running.
+droponoff nuke-scratch
 ```
 
 ## Requirements
 
-- macOS only
-- Rust toolchain for building
+- macOS only. At the time of this writing, tested on Tahoe.
 
 ## Warning
 
-This tool directly manipulates Dropbox's runtime state. While designed to be safe and reversible, use with caution and ensure you understand what it does before running it.
+This tool directly manipulates Dropbox's runtime state. While designed to be as safe and reasonable given that it is doing inherently unsafe things, use with caution and ensure you understand what it does before running it.
