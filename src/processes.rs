@@ -53,7 +53,6 @@ pub fn quit_dropbox_gracefully() -> Result<()> {
     Ok(())
 }
 
-
 pub fn wait_for_processes_to_die(timeout_secs: u64) -> Result<()> {
     let start = std::time::Instant::now();
     let timeout = Duration::from_secs(timeout_secs);
