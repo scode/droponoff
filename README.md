@@ -18,7 +18,11 @@ A **scriptable, reversible kill switch for Dropbox** on macOS.
 
 ## Purpose
 
-`droponoff` exists to **make it safe to clean up Dropbox's leaked scratch files** that eat unbounded amount of disk space. Dropbox sometimes leaves behind `scratch_files` under its File Provider group container, and you shouldn't touch them while Dropbox is running. This tool provides a reversible way to stop Dropbox completely, verify it's off, and then remove those leftovers. (But again, this is entirely unsupported and risky.)
+`droponoff` serves two purposes:
+
+1. **Reversible Dropbox kill switch**: Completely disable Dropbox (processes, LaunchAgents, File Provider extensions) and later restore it to normal operation. Useful for any scenario where you need Dropbox fully stopped.
+
+2. **Recover disk space from leaked scratch files**: Dropbox can accumulate unbounded temporary files (`scratch_files`) under its File Provider group container that are never cleaned up. The `nuke-scratch` command deletes these files after verifying Dropbox is fully stopped.
 
 ## Installation
 
