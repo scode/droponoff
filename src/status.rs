@@ -79,6 +79,10 @@ pub fn print_status(status: &Status) {
     }
 }
 
+fn format_gb(bytes: u64) -> String {
+    format!("{:.2} GB", bytes as f64 / 1_000_000_000.0)
+}
+
 /// Delete immediate children inside any scratch_files directories under the Dropbox root mount.
 pub fn clean_scratch_files() -> Result<()> {
     let home = discovery::get_home_dir()?;
@@ -95,6 +99,9 @@ pub fn clean_scratch_files() -> Result<()> {
     if !root_mount.exists() {
         anyhow::bail!("Dropbox root-mount not found at {}", root_mount.display());
     }
+
+    // Collect all files to delete with their sizes
+    let mut files_to_delete: Vec<(PathBuf, u64)> = Vec::new();
 
     // Find files immediately inside a directory like this and delete them:
     //
@@ -122,18 +129,43 @@ pub fn clean_scratch_files() -> Result<()> {
             let child_path = child.path();
 
             if child_type.is_file() || child_type.is_symlink() {
-                info!("    rm {}", child_path.display());
-                fs::remove_file(&child_path)?;
+                let size = child.metadata().map(|m| m.len()).unwrap_or(0);
+                files_to_delete.push((child_path, size));
             } else {
                 info!("    Skipping directory {}", child_path.display());
             }
         }
     }
 
+    // Delete files and track progress
+    let mut total_nuked: u64 = 0;
+    let file_count = files_to_delete.len();
+
+    for (i, (child_path, size)) in files_to_delete.iter().enumerate() {
+        let next_size = files_to_delete.get(i + 1).map(|(_, s)| *s).unwrap_or(0);
+        info!(
+            "    ({} nuked, next: {}) rm {}",
+            format_gb(total_nuked),
+            format_gb(next_size),
+            child_path.display()
+        );
+        fs::remove_file(child_path)?;
+        total_nuked += size;
+    }
+
     if !found_any {
         info!(
             "  No scratch_files directories found under {}",
             root_mount.display()
+        );
+    }
+
+    if file_count > 0 {
+        info!("");
+        info!(
+            "Nuked {} over {} files.",
+            format_gb(total_nuked),
+            file_count
         );
     }
 
